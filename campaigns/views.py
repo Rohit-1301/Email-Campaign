@@ -21,17 +21,30 @@ class UnsubscribeView(APIView):
     Endpoint dedicated exclusively to unsubscribe functionality.
     Handles POST /api/unsubscribe/
     """
+    def get(self, request, *args, **kwargs):
+        email = request.query_params.get('email')
+        if not email:
+            return Response({"detail": "Email parameter is required."}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            subscriber = Subscriber.objects.get(email=email)
+        except Subscriber.DoesNotExist:
+            return Response({"detail": "Subscriber not found."}, status=status.HTTP_404_NOT_FOUND)
+            
+        subscriber.is_active = False
+        subscriber.unsubscribed_at = timezone.now()
+        subscriber.save(update_fields=['is_active', 'unsubscribed_at'])
+        
+        return Response({"detail": f"Successfully unsubscribed {email}."}, status=status.HTTP_200_OK)
+
     def post(self, request, *args, **kwargs):
         serializer = UnsubscribeSerializer(data=request.data)
         if serializer.is_valid():
             email = serializer.validated_data['email']
-            # We already validated the subscriber exists
             subscriber = Subscriber.objects.get(email=email)
             
-            # Requirements: Set is_active=False & unsubscribed_at timestamp
             subscriber.is_active = False
             subscriber.unsubscribed_at = timezone.now()
-            # Django's auto_now handles updated_at
             subscriber.save(update_fields=['is_active', 'unsubscribed_at'])
             
             return Response({"detail": "Successfully unsubscribed."}, status=status.HTTP_200_OK)
